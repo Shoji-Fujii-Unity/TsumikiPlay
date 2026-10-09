@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>積み木遊び</title>
+<style>
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #05070a;
+  color: #e6eef8;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", "Noto Sans SC", sans-serif;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 横長16:9で表示する。スマホでは横向き前提の画面になる。 */
+#game {
+  position: relative;
+  width: min(100vw, calc(100vh * 16 / 9));
+  height: min(100vh, calc(100vw * 9 / 16));
+  overflow: hidden;
+  background: #05070a;
+  border-radius: 12px;
+  box-shadow: 0 0 30px rgba(0, 0, 0, .6);
+}
+
+canvas#c {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+#ui {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+#topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: linear-gradient(to bottom, rgba(5, 7, 10, .78), rgba(5, 7, 10, 0));
+}
+
+#topbar * { pointer-events: auto; }
+
+#title {
+  font-size: clamp(13px, 2.2vmin, 20px);
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-shadow: 0 1px 8px #000;
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+button, select, input, .btn {
+  font: inherit;
+  font-size: clamp(11px, 1.8vmin, 14px);
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, .18);
+  background: rgba(20, 28, 38, .78);
+  color: #e6eef8;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:hover, select:hover {
+  background: rgba(40, 52, 68, .88);
+}
+
+button.active {
+  border-color: #6fb3ff;
+  box-shadow: 0 0 0 2px rgba(111, 179, 255, .25);
+  background: rgba(30, 55, 80, .88);
+}
+
+#palette {
+  position: absolute;
+  left: 8px;
+  top: 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
+  max-height: calc(100% - 120px);
+  overflow: auto;
+  padding: 4px;
+}
+
+#palette * { pointer-events: auto; }
+
+#colors {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(28px, 4.2vmin));
+  gap: 6px;
+}
+
+.colorbtn {
+  width: 4.2vmin;
+  height: 4.2vmin;
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 8px;
+  border: 2px solid rgba(255, 255, 255, .22);
+}
+
+.colorbtn.active {
+  transform: scale(1.08);
+  border-color: #fff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, .45);
+}
+
+#modes {
+  position: absolute;
+  right: 8px;
+  top: 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#modes * { pointer-events: auto; }
+
+.modebtn { min-width: 56px; }
+
+#bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 6px;
+  text-align: center;
+  font-size: clamp(10px, 1.5vmin, 13px);
+  opacity: .78;
+  pointer-events: none;
+  text-shadow: 0 1px 4px #000;
+}
+
+.modal {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, .65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  pointer-events: auto;
+}
+
+.panel {
+  width: min(520px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  background: rgba(12, 18, 26, .96);
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.panel * { pointer-events: auto; }
+
+.panel h2 {
+  margin: 0 0 10px;
+  font-size: clamp(15px, 2.4vmin, 20px);
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.row input {
+  flex: 1;
+  min-width: 120px;
+}
+
+#slotList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.slot {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 6px;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, .12);
+  background: rgba(255, 255, 255, .05);
+  border-radius: 10px;
+  padding: 8px;
+}
+
+.slot .name {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slot .meta {
+  font-size: .8em;
+  opacity: .7;
+}
+
+.empty {
+  opacity: .7;
+  padding: 12px;
+}
+
+.hidden { display: none !important; }
+
+#rotateHint {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: rgba(5, 7, 10, .94);
+  font-size: 16px;
+  z-index: 50;
+  padding: 20px;
+  pointer-events: none;
+}
+
+#rotateHint.show {
+  display: flex;
+  pointer-events: auto;
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="game">
+    <canvas id="c"></canvas>
+
+    <div id="ui">
+      <div id="topbar">
+        <div id="title">積み木遊び</div>
+        <div class="actions">
+          <button id="btnSound">🔊 On</button>
+          <button id="btnSave">保存 / 読込</button>
+          <button id="btnClear">クリア</button>
+          <select id="lang" aria-label="language">
+            <option value="ja">日本語</option>
+            <option value="en">English</option>
+            <option value="zh">中文</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="palette">
+        <div id="colors"></div>
+      </div>
+
+      <div id="modes">
+        <button class="modebtn active" data-mode="place">置く</button>
+        <button class="modebtn" data-mode="delete">消す</button>
+        <button class="modebtn" data-mode="paint">色変更</button>
+      </div>
+
+      <div id="bottom">タップでブロックを置きます</div>
+
+      <div id="saveModal" class="modal hidden">
+        <div class="panel">
+          <h2 id="modalTitle">保存 / 読込</h2>
+          <div class="row">
+            <input id="saveName" placeholder="セーブデータ名" maxlength="24">
+            <button id="btnSaveNew">保存</button>
+          </div>
+          <ul id="slotList"></ul>
+          <div class="row" style="justify-content:flex-end;margin-top:10px;">
+            <button id="btnCloseModal">閉じる</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="rotateHint">Please rotate your device to landscape.</div>
+    </div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+/*
+  積み木遊び
+  - Three.js
+  - 横長画面
+  - サウンド On/Off
+  - 多言語対応 (ja / en / zh)
+  - ローカルストレージに複数セーブデータ保存
+*/
+
+const SETTINGS_KEY = "tsumiki_settings_v1";
+const SAVES_KEY = "tsumiki_save_slots_v1";
+const MAX_BLOCKS = 600;
+const GRID_SIZE = 128;
+const GRID_MIN = -GRID_SIZE / 2;
+const GRID_MAX = GRID_SIZE / 2 - 1;
+const inGrid = (x, z) => x >= GRID_MIN && x <= GRID_MAX && z >= GRID_MIN && z <= GRID_MAX;
+const MAX_HEIGHT = 12;
+
+const I18N = {
+  ja: {
+    soundOn: "🔊 On",
+    soundOff: "🔇 Off",
+    saveLoad: "保存 / 読込",
+    clear: "クリア",
+    close: "閉じる",
+    saveNew: "保存",
+    name: "セーブデータ名",
+    load: "読込",
+    delete: "削除",
+    noSlots: "セーブデータがありません",
+    rotate: "横向きで開いてください",
+    place: "置く",
+    deleteMode: "消す",
+    paint: "色変更",
+    tapPlace: "タップでブロックを置きます",
+    tapDelete: "タップでブロックを消します",
+    tapPaint: "タップでブロックの色を変えます",
+    confirmClear: "すべて消しますか？",
+    confirmDelete: "このセーブデータを削除しますか？",
+    saved: "保存しました",
+    loaded: "読み込みました",
+    deleted: "削除しました",
+    cleared: "クリアしました",
+    errorSave: "ローカルに保存できません",
+    errorLoad: "セーブデータを読み込めません",
+    unnamed: "無題"
+  },
+  en: {
+    soundOn: "🔊 On",
+    soundOff: "🔇 Off",
+    saveLoad: "Save / Load",
+    clear: "Clear",
+    close: "Close",
+    saveNew: "Save",
+    name: "Save data name",
+    load: "Load",
+    delete: "Delete",
+    noSlots: "No save data",
+    rotate: "Please rotate your device to landscape",
+    place: "Place",
+    deleteMode: "Delete",
+    paint: "Paint",
+    tapPlace: "Tap to place blocks. Drag to rotate.",
+    tapDelete: "Tap blocks to delete them.",
+    tapPaint: "Tap blocks to change their color.",
+    confirmClear: "Clear all blocks?",
+    confirmDelete: "Delete this save data?",
+    saved: "Saved",
+    loaded: "Loaded",
+    deleted: "Deleted",
+    cleared: "Cleared",
+    errorSave: "Cannot save locally",
+    errorLoad: "Cannot load save data",
+    unnamed: "Untitled"
+  },
+  zh: {
+    soundOn: "🔊 开",
+    soundOff: "🔇 关",
+    saveLoad: "保存 / 读取",
+    clear: "清除",
+    close: "关闭",
+    saveNew: "保存",
+    name: "存档名称",
+    load: "读取",
+    delete: "删除",
+    noSlots: "没有存档",
+    rotate: "请横屏使用",
+    place: "放置",
+    deleteMode: "删除",
+    paint: "上色",
+    tapPlace: "点击放置积木，拖动旋转",
+    tapDelete: "点击积木删除",
+    tapPaint: "点击积木更改颜色",
+    confirmClear: "清除所有积木？",
+    confirmDelete: "删除该存档？",
+    saved: "已保存",
+    loaded: "已读取",
+    deleted: "已删除",
+    cleared: "已清除",
+    errorSave: "无法保存到本地",
+    errorLoad: "无法读取存档",
+    unnamed: "未命名"
+  }
+};
+
+const colorList = [
+  0xff6b6b,
+  0xffd166,
+  0x06d6a0,
+  0x4cc9f0,
+  0xf77f00,
+  0xb388ff,
+  0xf15bb5,
+  0xffffff
+];
+
+let state = {
+  lang: "ja",
+  soundOn: true,
+  mode: "place",
+  color: 0
+};
+
+const els = {
+  canvas: document.getElementById("c"),
+  game: document.getElementById("game"),
+  title: document.getElementById("title"),
+  sound: document.getElementById("btnSound"),
+  save: document.getElementById("btnSave"),
+  clear: document.getElementById("btnClear"),
+  lang: document.getElementById("lang"),
+  colors: document.getElementById("colors"),
+  modes: document.querySelectorAll(".modebtn"),
+  bottom: document.getElementById("bottom"),
+  modal: document.getElementById("saveModal"),
+  modalTitle: document.getElementById("modalTitle"),
+  saveName: document.getElementById("saveName"),
+  saveNew: document.getElementById("btnSaveNew"),
+  closeModal: document.getElementById("btnCloseModal"),
+  slotList: document.getElementById("slotList"),
+  rotate: document.getElementById("rotateHint")
+};
+
+function t(key) {
+  return (I18N[state.lang] && I18N[state.lang][key]) || I18N.ja[key] || key;
+}
+
+/* Three.js 初期化 */
+const renderer = new THREE.WebGLRenderer({ canvas: els.canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x071018);
+scene.fog = new THREE.Fog(0x071018, 60, 220);
+
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 500);
+camera.position.set(7, 7.5, 9);
+
+const controls = new OrbitControls(camera, els.canvas);
+controls.target.set(0, 0.8, 0);
+controls.enableDamping = true;
+controls.minDistance = 6;
+controls.maxDistance = 200;
+controls.maxPolarAngle = Math.PI / 2 - 0.03;
+controls.minPolarAngle = 0.1;
+controls.enablePan = false;
+controls.rotateSpeed = 0.55;
+controls.zoomSpeed = 0.7;
+controls.touches.ONE = THREE.TOUCH.ROTATE;
+controls.touches.TWO = THREE.TOUCH.DOLLY_ROTATE;
+
+const hemi = new THREE.HemisphereLight(0xffffff, 0x223344, 1.1);
+scene.add(hemi);
+
+const dir = new THREE.DirectionalLight(0xffffff, 1.2);
+dir.position.set(6, 12, 8);
+dir.castShadow = true;
+dir.shadow.mapSize.set(512, 512);
+dir.shadow.camera.left = -20;
+dir.shadow.camera.right = 20;
+dir.shadow.camera.top = 20;
+dir.shadow.camera.bottom = -20;
+dir.shadow.camera.near = 1;
+dir.shadow.camera.far = 40;
+scene.add(dir);
+
+const groundGeo = new THREE.PlaneGeometry(GRID_SIZE, GRID_SIZE);
+const groundMat = new THREE.MeshStandardMaterial({ color: 0x14202c, roughness: 0.95, metalness: 0 });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.position.set(-0.5, 0, -0.5);
+ground.receiveShadow = true;
+ground.userData.isGround = true;
+scene.add(ground);
+
+const grid = new THREE.GridHelper(GRID_SIZE, GRID_SIZE, 0x395066, 0x1b2a36);
+grid.position.set(-0.5, 0.002, -0.5);
+grid.raycast = () => {};
+scene.add(grid);
+
+const blockGeo = new THREE.BoxGeometry(1, 1, 1);
+const edgeGeo = new THREE.EdgesGeometry(blockGeo);
+const edgeMat = new THREE.LineBasicMaterial({ color: 0x10151a, transparent: true, opacity: 0.6 });
+
+const materialCache = new Map();
+const blockMap = new Map();
+const blockMeshes = [];
+
+function key(x, y, z) {
+  return `${x},${y},${z}`;
+}
+
+function getColorMat(hex) {
+  const c = Number.isFinite(hex) ? Math.floor(hex) : 0xffffff;
+  const normalized = c & 0xffffff;
+  let mat = materialCache.get(normalized);
+  if (!mat) {
+    mat = new THREE.MeshStandardMaterial({
+      color: normalized,
+      roughness: 0.45,
+      metalness: 0.05
+    });
+    materialCache.set(normalized, mat);
+  }
+  return mat;
+}
+
+function createBlock(x, y, z, color) {
+  const mesh = new THREE.Mesh(blockGeo, getColorMat(color));
+  mesh.position.set(x, y + 0.5, z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.userData = { isBlock: true, x, y, z };
+
+  const edges = new THREE.LineSegments(edgeGeo, edgeMat);
+  edges.userData.noRay = true;
+  edges.renderOrder = 1;
+  mesh.add(edges);
+
+  return mesh;
+}
+
+function addBlock(x, y, z, color) {
+  x = Math.round(x);
+  y = Math.round(y);
+  z = Math.round(z);
+
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return false;
+  if (!inGrid(x, z) || y < 0 || y >= MAX_HEIGHT) return false;
+  if (blockMap.size >= MAX_BLOCKS) return false;
+
+  const k = key(x, y, z);
+  if (blockMap.has(k)) return false;
+
+  const c = Number.isFinite(color) ? Number(color) : 0xffffff;
+  const mesh = createBlock(x, y, z, c);
+
+  blockMap.set(k, mesh);
+  blockMeshes.push(mesh);
+  scene.add(mesh);
+  return true;
+}
+
+function removeBlock(mesh) {
+  if (!mesh || !mesh.userData || !mesh.userData.isBlock) return false;
+
+  const { x, y, z } = mesh.userData;
+  const k = key(x, y, z);
+  if (!blockMap.has(k)) return false;
+
+  blockMap.delete(k);
+  const idx = blockMeshes.indexOf(mesh);
+  if (idx >= 0) blockMeshes.splice(idx, 1);
+  scene.remove(mesh);
+  return true;
+}
+
+function clearAll() {
+  for (const m of blockMap.values()) scene.remove(m);
+  blockMap.clear();
+  blockMeshes.length = 0;
+}
+
+function buildSample() {
+  for (let x = -1; x <= 1; x++) {
+    for (let z = -1; z <= 1; z++) {
+      const idx = (x + 1) * 3 + (z + 1);
+      addBlock(x, 0, z, colorList[idx % colorList.length]);
+    }
+  }
+
+  addBlock(0, 1, 0, colorList[1]);
+  addBlock(0, 1, 1, colorList[2]);
+  addBlock(1, 1, 0, colorList[3]);
+  addBlock(-1, 1, 0, colorList[4]);
+}
+
+/* 音 */
+let audioCtx = null;
+
+function ensureAudio() {
+  try {
+    if (!audioCtx) {
+      const C = window.AudioContext || window.webkitAudioContext;
+      if (C) audioCtx = new C();
+    }
+    if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+  } catch (e) {
+    audioCtx = null;
+  }
+}
+
+function playTone(freq, dur = 0.12, type = "triangle", vol = 0.14) {
+  if (!state.soundOn) return;
+  ensureAudio();
+  if (!audioCtx) return;
+
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, now);
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(vol, now + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  osc.start(now);
+  osc.stop(now + dur + 0.05);
+}
+
+function playPlace(y) {
+  playTone(220 + Math.min(y, 12) * 35 + Math.random() * 18, 0.11, "triangle", 0.12);
+}
+
+function playDelete() {
+  playTone(110, 0.18, "sawtooth", 0.14);
+}
+
+function playPaint() {
+  playTone(500, 0.07, "square", 0.07);
+}
+
+function playUI() {
+  playTone(650, 0.04, "square", 0.04);
+}
+
+window.addEventListener("pointerdown", () => ensureAudio(), { once: true });
+
+/* 操作 */
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+
+let pointerDown = false;
+let downX = 0;
+let downY = 0;
+let downId = null;
+let dragMoved = false;
+
+function getIntersections(e) {
+  const rect = els.canvas.getBoundingClientRect();
+  if (!rect.width || !rect.height) return [];
+
+  pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+  raycaster.setFromCamera(pointer, camera);
+  const targets = [ground, ...blockMeshes];
+  return raycaster.intersectObjects(targets, false);
+}
+
+function tryPlace(hit) {
+  const color = colorList[state.color] ?? 0xffffff;
+
+  if (hit.object === ground) {
+    const x = Math.round(hit.point.x);
+    const z = Math.round(hit.point.z);
+
+    if (!inGrid(x, z)) return null;
+
+    const y = 0;
+    if (addBlock(x, y, z, color)) return y;
+    return null;
+  }
+
+  if (hit.object.userData && hit.object.userData.isBlock) {
+    const bx = hit.object.userData.x;
+    const by = hit.object.userData.y;
+    const bz = hit.object.userData.z;
+
+    let nx = 0, ny = 0, nz = 0;
+
+    if (hit.face && hit.face.normal) {
+      const n = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+      nx = Math.round(n.x);
+      ny = Math.round(n.y);
+      nz = Math.round(n.z);
+    }
+
+    if (nx === 0 && ny === 0 && nz === 0) {
+      const dx = hit.point.x - bx;
+      const dy = hit.point.y - (by + 0.5);
+      const dz = hit.point.z - bz;
+
+      const ax = Math.abs(dx);
+      const ay = Math.abs(dy);
+      const az = Math.abs(dz);
+
+      if (ax >= ay && ax >= az) nx = Math.sign(dx);
+      else if (ay >= ax && ay >= az) ny = Math.sign(dy);
+      else nz = Math.sign(dz);
+    }
+
+    const tx = bx + nx;
+    const ty = by + ny;
+    const tz = bz + nz;
+
+    if (!inGrid(tx, tz) || ty < 0 || ty >= MAX_HEIGHT) return null;
+
+    if (addBlock(tx, ty, tz, color)) return ty;
+  }
+
+  return null;
+}
+
+function handleTap(e, forceMode = null) {
+  const hits = getIntersections(e);
+  if (!hits.length) return;
+
+  const mode = forceMode || state.mode;
+  const hit = hits[0];
+
+  if (mode === "place") {
+    const placedY = tryPlace(hit);
+    if (placedY !== null) playPlace(placedY);
+    return;
+  }
+
+  if (mode === "delete") {
+    if (removeBlock(hit.object)) playDelete();
+    return;
+  }
+
+  if (mode === "paint") {
+    if (hit.object.userData && hit.object.userData.isBlock) {
+      hit.object.material = getColorMat(colorList[state.color]);
+      playPaint();
+    }
+  }
+}
+
+els.canvas.addEventListener("pointerdown", (e) => {
+  if (!e.isPrimary) return;
+
+  pointerDown = true;
+  downX = e.clientX;
+  downY = e.clientY;
+  downId = e.pointerId;
+  dragMoved = false;
+
+  ensureAudio();
+});
+
+els.canvas.addEventListener("pointermove", (e) => {
+  if (!pointerDown || e.pointerId !== downId) return;
+  if (Math.hypot(e.clientX - downX, e.clientY - downY) > 10) dragMoved = true;
+});
+
+els.canvas.addEventListener("pointerup", (e) => {
+  if (!pointerDown || e.pointerId !== downId) return;
+
+  pointerDown = false;
+
+  if (!dragMoved) {
+    handleTap(e, e.button === 2 ? "delete" : null);
+  }
+});
+
+els.canvas.addEventListener("pointercancel", () => {
+  pointerDown = false;
+});
+
+els.canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+
+/* UI: 言語 */
+function applyLanguage() {
+  document.documentElement.lang = state.lang;
+
+  els.title.textContent = "積み木遊び";
+  els.sound.textContent = state.soundOn ? t("soundOn") : t("soundOff");
+  els.save.textContent = t("saveLoad");
+  els.clear.textContent = t("clear");
+
+  els.modalTitle.textContent = t("saveLoad");
+  els.saveNew.textContent = t("saveNew");
+  els.saveName.placeholder = t("name");
+  els.closeModal.textContent = t("close");
+  els.rotate.textContent = t("rotate");
+
+  els.modes.forEach((btn) => {
+    const m = btn.dataset.mode;
+    if (m === "place") btn.textContent = t("place");
+    if (m === "delete") btn.textContent = t("deleteMode");
+    if (m === "paint") btn.textContent = t("paint");
+  });
+
+  renderSlots();
+  updateHelp();
+}
+
+function setLang(lang) {
+  if (!I18N[lang]) return;
+  state.lang = lang;
+  els.lang.value = lang;
+  saveSettings();
+  applyLanguage();
+  playUI();
+}
+
+els.lang.addEventListener("change", (e) => setLang(e.target.value));
+
+/* UI: サウンド */
+els.sound.addEventListener("click", () => {
+  state.soundOn = !state.soundOn;
+  saveSettings();
+  applyLanguage();
+  playUI();
+});
+
+/* UI: モード */
+function setMode(mode, play = true) {
+  if (!["place", "delete", "paint"].includes(mode)) return;
+
+  state.mode = mode;
+  els.modes.forEach((btn) => btn.classList.toggle("active", btn.dataset.mode === mode));
+  updateHelp();
+
+  if (play) playUI();
+}
+
+els.modes.forEach((btn) => {
+  btn.addEventListener("click", () => setMode(btn.dataset.mode, true));
+});
+
+function updateHelp() {
+  els.bottom.textContent = t(state.mode === "place" ? "tapPlace" : state.mode === "delete" ? "tapDelete" : "tapPaint");
+}
+
+let flashTimer = 0;
+function flash(msg) {
+  clearTimeout(flashTimer);
+  els.bottom.textContent = msg;
+  flashTimer = setTimeout(() => updateHelp(), 1800);
+}
+
+/* UI: 色 */
+function createColorButtons() {
+  els.colors.innerHTML = "";
+
+  colorList.forEach((hex, i) => {
+    const btn = document.createElement("button");
+    btn.className = "colorbtn" + (i === state.color ? " active" : "");
+    btn.style.background = "#" + hex.toString(16).padStart(6, "0");
+    btn.setAttribute("aria-label", "color " + (i + 1));
+
+    btn.addEventListener("click", () => {
+      state.color = i;
+      updateColorActive();
+      playUI();
+    });
+
+    els.colors.appendChild(btn);
+  });
+}
+
+function updateColorActive() {
+  Array.from(els.colors.children).forEach((btn, i) => {
+    btn.classList.toggle("active", i === state.color);
+  });
+}
+
+/* UI: クリア */
+els.clear.addEventListener("click", () => {
+  if (!confirm(t("confirmClear"))) return;
+  clearAll();
+  playDelete();
+  flash(t("cleared"));
+});
+
+/* ローカル保存 */
+function saveSettings() {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+      lang: state.lang,
+      soundOn: state.soundOn
+    }));
+  } catch (e) {}
+}
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (data && I18N[data.lang]) state.lang = data.lang;
+    if (typeof data.soundOn === "boolean") state.soundOn = data.soundOn;
+  } catch (e) {}
+}
+
+function getSaves() {
+  try {
+    const raw = localStorage.getItem(SAVES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveStore(list) {
+  try {
+    localStorage.setItem(SAVES_KEY, JSON.stringify(list));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function makeState() {
+  return {
+    v: 1,
+    settings: {
+      lang: state.lang,
+      soundOn: state.soundOn
+    },
+    blocks: Array.from(blockMap.values()).map((m) => ({
+      x: m.userData.x,
+      y: m.userData.y,
+      z: m.userData.z,
+      color: m.material.color.getHex()
+    }))
+  };
+}
+
+function normalizeBlocks(arr) {
+  if (!Array.isArray(arr)) return null;
+
+  return arr
+    .slice(0, MAX_BLOCKS)
+    .map((b) => ({
+      x: Math.round(Number(b.x)),
+      y: Math.round(Number(b.y)),
+      z: Math.round(Number(b.z)),
+      color: Number(b.color)
+    }))
+    .filter((b) =>
+      Number.isFinite(b.x) &&
+      Number.isFinite(b.y) &&
+      Number.isFinite(b.z) &&
+      Number.isFinite(b.color) &&
+      inGrid(b.x, b.z) &&
+      b.y >= 0 &&
+      b.y < MAX_HEIGHT
+    );
+}
+
+function loadState(payload) {
+  if (!payload || !Array.isArray(payload.blocks)) return false;
+
+  const blocks = normalizeBlocks(payload.blocks);
+  if (blocks === null) return false;
+
+  clearAll();
+  for (const b of blocks) addBlock(b.x, b.y, b.z, b.color);
+  return true;
+}
+
+function openSaveModal() {
+  els.saveName.value = "";
+  renderSlots();
+  els.modal.classList.remove("hidden");
+  playUI();
+}
+
+function closeSaveModal() {
+  els.modal.classList.add("hidden");
+}
+
+els.save.addEventListener("click", openSaveModal);
+els.closeModal.addEventListener("click", closeSaveModal);
+els.modal.addEventListener("click", (e) => {
+  if (e.target === els.modal) closeSaveModal();
+});
+
+els.saveNew.addEventListener("click", () => {
+  const list = getSaves();
+
+  const name = (els.saveName.value.trim() || `${t("unnamed")} ${new Date().toLocaleString(state.lang)}`).slice(0, 30);
+  const now = new Date().toISOString();
+
+  const slot = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+    name,
+    createdAt: now,
+    updatedAt: now,
+    state: makeState()
+  };
+
+  list.push(slot);
+  list.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
+  const limited = list.slice(0, 10);
+
+  if (!saveStore(limited)) {
+    flash(t("errorSave"));
+    return;
+  }
+
+  renderSlots();
+  flash(t("saved"));
+  playUI();
+});
+
+function renderSlots() {
+  const list = getSaves().sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
+  els.slotList.innerHTML = "";
+
+  if (!list.length) {
+    const li = document.createElement("li");
+    li.className = "empty";
+    li.textContent = t("noSlots");
+    els.slotList.appendChild(li);
+    return;
+  }
+
+  for (const slot of list) {
+    const li = document.createElement("li");
+    li.className = "slot";
+
+    const info = document.createElement("div");
+
+    const name = document.createElement("div");
+    name.className = "name";
+    name.textContent = slot.name || t("unnamed");
+
+    const meta = document.createElement("div");
+    meta.className = "meta";
+
+    let dateText = "?";
+    try {
+      dateText = new Date(slot.updatedAt).toLocaleString(state.lang);
+    } catch (e) {}
+
+    const count = slot.state && Array.isArray(slot.state.blocks) ? slot.state.blocks.length : 0;
+    meta.textContent = `${dateText} · ${count}`;
+
+    info.append(name, meta);
+
+    const loadBtn = document.createElement("button");
+    loadBtn.textContent = t("load");
+    loadBtn.dataset.load = slot.id;
+
+    const delBtn = document.createElement("button");
+    delBtn.textContent = t("delete");
+    delBtn.dataset.del = slot.id;
+
+    li.append(info, loadBtn, delBtn);
+    els.slotList.appendChild(li);
+  }
+}
+
+els.slotList.addEventListener("click", (e) => {
+  const btn = e.target.closest("button");
+  if (!btn) return;
+
+  if (btn.dataset.load) loadSlot(btn.dataset.load);
+  if (btn.dataset.del) deleteSlot(btn.dataset.del);
+});
+
+function loadSlot(id) {
+  const list = getSaves();
+  const slot = list.find((s) => s.id === id);
+  if (!slot) return;
+
+  if (!loadState(slot.state)) {
+    flash(t("errorLoad"));
+    return;
+  }
+
+  if (slot.state && slot.state.settings) {
+    const s = slot.state.settings;
+    if (I18N[s.lang]) state.lang = s.lang;
+    if (typeof s.soundOn === "boolean") state.soundOn = s.soundOn;
+  }
+
+  saveSettings();
+  els.lang.value = state.lang;
+  applyLanguage();
+  closeSaveModal();
+  flash(t("loaded"));
+  playUI();
+}
+
+function deleteSlot(id) {
+  if (!confirm(t("confirmDelete"))) return;
+
+  const list = getSaves().filter((s) => s.id !== id);
+  if (!saveStore(list)) {
+    flash(t("errorSave"));
+    return;
+  }
+
+  renderSlots();
+  flash(t("deleted"));
+  playUI();
+}
+
+/* 画面サイズ */
+function resize() {
+  const w = els.game.clientWidth;
+  const h = els.game.clientHeight;
+  if (!w || !h) return;
+
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+
+let rotateDismissed = false;
+
+function updateRotateHint() {
+  const isPortrait = window.innerWidth < window.innerHeight;
+  const small = els.game.clientWidth < 520;
+
+  if (!rotateDismissed && isPortrait && small) {
+    els.rotate.classList.add("show");
+  } else {
+    els.rotate.classList.remove("show");
+  }
+}
+
+els.rotate.addEventListener("click", () => {
+  rotateDismissed = true;
+  els.rotate.classList.remove("show");
+});
+
+new ResizeObserver(resize).observe(els.game);
+window.addEventListener("resize", () => {
+  resize();
+  updateRotateHint();
+});
+
+/* メインループ */
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+/* 初期化 */
+function init() {
+  loadSettings();
+  els.lang.value = state.lang;
+
+  createColorButtons();
+  setMode("place", false);
+  applyLanguage();
+
+  buildSample();
+  resize();
+  updateRotateHint();
+  animate();
+}
+
+init();
+</script>
+</body>
+</html>
